@@ -46,7 +46,7 @@ export async function handleClaudeQuery(
     let claudeBuilder = claude()
       .skipPermissions()
       .withSignal(abortSignal)
-      .onToolUse((tool) => {
+      .onToolUse(async (tool) => {
         toolCallCount++;
 
         const input = tool.input as Record<string, unknown> | undefined;
@@ -63,6 +63,10 @@ export async function handleClaudeQuery(
         if (filePath) details += (details ? "\n" : "") + `파일: ${filePath}`;
 
         currentToolInfo = `🔧 *${tool.name}*${details ? "\n" + details : ""}`;
+        
+        // 즉시 UI 업데이트 (툴 실행 정보를 실시간으로 보여주기)
+        const elapsedSeconds = Math.round((Date.now() - startTime) / 1000);
+        await callbacks.onProgress(progressText, currentToolInfo, elapsedSeconds, toolCallCount);
       });
 
     // 기존 세션이 있으면 이어서 대화
