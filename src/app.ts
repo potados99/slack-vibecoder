@@ -40,6 +40,7 @@ interface SessionState {
   startTime: number;
   timerId: NodeJS.Timeout | null;
   lastText: string;
+  lastIcon: string; // 현재 메시지 아이콘 (🤔, ⏳ 등)
   lastToolInfo: string | undefined;
   lastToolCallCount: number;
   channel: string;
@@ -51,6 +52,7 @@ const sessionStates = new Map<string, SessionState>();
 
 /**
  * 메타데이터만 업데이트하는 함수 (타이머용)
+ * 메시지 본문(아이콘, 텍스트)은 유지하고 시간/도구 호출 횟수만 업데이트
  */
 async function updateMetadataOnly(threadTs: string): Promise<void> {
   const state = sessionStates.get(threadTs);
@@ -76,6 +78,11 @@ async function updateMetadataOnly(threadTs: string): Promise<void> {
   const versionInfo = versionInfoParts.length > 0 ? `, ${versionInfoParts.join(" ")}` : "";
   const metadataText = `_${timeStr} 경과, 도구 ${state.lastToolCallCount}회 호출${versionInfo}_`;
 
+  // 현재 메시지 상태(아이콘, 텍스트) 유지
+  const messageText = state.lastText 
+    ? `<@${state.userId}> ${state.lastIcon}\n\n${state.lastToolInfo ? `${state.lastToolInfo}\n\n` : ""}> ${state.lastText.slice(0, 2900)}${state.lastText.length > 2900 ? "..." : ""}`
+    : `<@${state.userId}> ${state.lastIcon}`;
+
   const progressBlocks = [
     {
       type: "context",
@@ -90,7 +97,7 @@ async function updateMetadataOnly(threadTs: string): Promise<void> {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `<@${state.userId}> ⏳ 작업 중...\n\n${state.lastToolInfo ? `${state.lastToolInfo}\n\n` : ""}> ${state.lastText.slice(0, 2900)}${state.lastText.length > 2900 ? "..." : ""}`,
+        text: messageText,
       },
     },
     {
@@ -114,7 +121,7 @@ async function updateMetadataOnly(threadTs: string): Promise<void> {
     await app.client.chat.update({
       channel: state.channel,
       ts: responseTs,
-      text: `<@${state.userId}> 작업 중...`,
+      text: `<@${state.userId}> ${state.lastIcon}`,
       blocks: progressBlocks,
     });
   } catch (error) {
@@ -255,6 +262,7 @@ app.event("app_mention", async ({ event, client, say }) => {
     startTime,
     timerId: null,
     lastText: "",
+    lastIcon: "🤔 생각하는 중...",
     lastToolInfo: undefined,
     lastToolCallCount: 0,
     channel,
@@ -275,6 +283,7 @@ app.event("app_mention", async ({ event, client, say }) => {
       onProgress: async (text: string, toolInfo: string | undefined, elapsedSeconds: number, toolCallCount: number) => {
         // 세션 상태 업데이트
         sessionState.lastText = text;
+        sessionState.lastIcon = "⏳ 작업 중...";
         sessionState.lastToolInfo = toolInfo;
         sessionState.lastToolCallCount = toolCallCount;
 
