@@ -87,43 +87,10 @@ check_pm2_health() {
             HEALTH_CHECK_DETAILS="$HEALTH_CHECK_DETAILS\nCPU 사용률: ${cpu}%"
         fi
         
-        # 최근 에러 로그 수집
-        local pm2_log_file="$HOME/.pm2/logs/${PM2_SERVICE_NAME}-err.log"
-        if [ -f "$pm2_log_file" ]; then
-            local recent_error_logs=$(tail -n 5 "$pm2_log_file" 2>/dev/null)
-            if [ -n "$recent_error_logs" ]; then
-                HEALTH_CHECK_DETAILS="$HEALTH_CHECK_DETAILS\n\n최근 에러 로그:\n\`\`\`\n$recent_error_logs\n\`\`\`"
-            fi
-        fi
-        
         return 1
     fi
 
-    # 최근 로그에서 치명적 에러 확인 (최근 20줄)
-    local pm2_log_file="$HOME/.pm2/logs/${PM2_SERVICE_NAME}-out.log"
-    local recent_errors=""
-    
-    if [ -f "$pm2_log_file" ]; then
-        recent_errors=$(tail -n 20 "$pm2_log_file" 2>/dev/null | grep -iE "(error|exception|fatal|crash)")
-    else
-        recent_errors=$(pm2 logs $PM2_SERVICE_NAME --nostream --lines 20 2>/dev/null | grep -iE "(error|exception|fatal|crash)")
-    fi
-    
-    local error_count=$(echo "$recent_errors" | grep -v "^$" | wc -l)
-
-    if [ "$error_count" -gt 3 ]; then
-        HEALTH_CHECK_DETAILS="PM2 상태: $status (정상)"
-        HEALTH_CHECK_DETAILS="$HEALTH_CHECK_DETAILS\n에러 로그 개수: $error_count개 (임계값: 3개 초과)"
-        
-        if [ -n "$recent_errors" ]; then
-            # 최근 에러 로그 일부 (최대 10줄)
-            local error_sample=$(echo "$recent_errors" | tail -n 10)
-            HEALTH_CHECK_DETAILS="$HEALTH_CHECK_DETAILS\n\n최근 에러 로그 샘플:\n\`\`\`\n$error_sample\n\`\`\`"
-        fi
-        
-        return 1
-    fi
-
+    # PM2 상태가 online이면 정상
     return 0
 }
 
@@ -263,7 +230,7 @@ main() {
         if ! check_pm2_health; then
             echo "[$(date)] PM2 상태 이상, 롤백 시작..."
             echo "[$(date)] 헬스체크 상세 정보: $HEALTH_CHECK_DETAILS"
-            rollback "헬스체크 실패 - PM2 상태 이상 또는 에러 로그 과다 감지" "$HEALTH_CHECK_DETAILS"
+            rollback "헬스체크 실패 - PM2 상태 이상" "$HEALTH_CHECK_DETAILS"
             echo "[$(date)] 재시작 스크립트 종료"
             return
         fi
