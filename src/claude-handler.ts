@@ -28,7 +28,9 @@ export async function handleClaudeQuery(
   threadTs: string,
   userQuery: string,
   callbacks: StreamCallbacks,
-  channelId?: string
+  channelId?: string,
+  responseTs?: string,
+  isInThread?: boolean
 ): Promise<string | null> {
   const session = sessionManager.getOrCreateSession(threadTs);
   const abortSignal = session.abortController.signal;
@@ -71,7 +73,7 @@ export async function handleClaudeQuery(
       claudeBuilder = claudeBuilder.withSessionId(session.claudeSessionId);
     }
 
-    const prompt = buildPrompt(userQuery, threadTs, channelId);
+    const prompt = buildPrompt(userQuery, threadTs, channelId, responseTs, isInThread);
 
     await claudeBuilder.query(prompt).stream(async (message: ClaudeMessage) => {
       // 중단 체크

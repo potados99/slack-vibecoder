@@ -394,7 +394,7 @@ app.event("app_mention", async ({ event, client, say }) => {
         });
         activeMessages.delete(messageKey);
       },
-    }, channel);
+    }, channel, responseTs, isInThread);
   } catch (error) {
     console.error("Claude 처리 중 오류:", error);
     activeMessages.delete(messageKey);

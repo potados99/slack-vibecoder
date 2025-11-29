@@ -283,10 +283,10 @@ main() {
         elapsed=$((elapsed + check_interval))
     done
 
-    # 타임아웃까지 성공 로그를 찾지 못한 경우
+    # 타임아웃까지 성공 로그를 찾지 못한 경우: 실패로 처리하고 롤백
     if [ $success_detected -eq 0 ]; then
-        echo "[$(date)] ${HEALTH_CHECK_TIMEOUT}초 타임아웃. PM2 상태는 정상이지만 턴어라운드 성공 로그 미확인."
-        send_slack_message "헬스체크 조건부 통과. PM2 상태는 정상이지만, 재시작 이후 실제 요청 처리는 아직 확인되지 않았습니다. 테스트 요청을 보내주세요."
+        echo "[$(date)] ${HEALTH_CHECK_TIMEOUT}초 타임아웃. 턴어라운드 성공 로그 미확인. 롤백 시작..."
+        rollback "헬스체크 실패 - 턴어라운드 성공 로그 미확인 (${HEALTH_CHECK_TIMEOUT}초 타임아웃)" ""
     fi
 
     echo "[$(date)] 재시작 스크립트 종료"
