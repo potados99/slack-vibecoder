@@ -342,6 +342,14 @@ app.event("app_mention", async ({ event, client, say }) => {
 
       // 최종 결과
       onResult: async (text: string, summary: { durationSeconds: number; toolCallCount: number }) => {
+        // 타이머를 가장 먼저 정리 (경합 조건 방지: updateMetadataOnly가 최종 메시지를 덮어쓰는 것 방지)
+        const sessionState = sessionStates.get(threadTs);
+        if (sessionState?.timerId) {
+          clearInterval(sessionState.timerId);
+          sessionState.timerId = null;
+        }
+        sessionStates.delete(threadTs);
+
         const minutes = Math.floor(summary.durationSeconds / 60);
         const seconds = summary.durationSeconds % 60;
         const timeStr = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
@@ -385,14 +393,6 @@ app.event("app_mention", async ({ event, client, say }) => {
           ],
         });
         activeMessages.delete(messageKey);
-
-        // 타이머 정리
-        const sessionState = sessionStates.get(threadTs);
-        if (sessionState?.timerId) {
-          clearInterval(sessionState.timerId);
-          sessionState.timerId = null;
-        }
-        sessionStates.delete(threadTs);
 
         // 성공적인 턴어라운드 로그 (restarter.sh가 감지하는 용도)
         console.log(`[${new Date().toISOString()}] ✅ TURNAROUND_SUCCESS: 스레드 ${threadTs} 완료 (${timeStr}, 도구 ${summary.toolCallCount}회)`);
