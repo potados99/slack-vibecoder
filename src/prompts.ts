@@ -10,8 +10,29 @@ export const systemPrompts = [
   `너의 cwd(슬랙 봇 애플리케이션 디렉토리 내부일 것이야)는 아무 의미가 없으니 프롬프트를 보고 이게 어떤 저장소를 의미하는건지 알아내는 데에 집중해야 해.`,
   `모든 git 저장소는 ~/Projects 디렉토리 내부에 있어. 새로 무언가를 클론받거나 기존 것을 보려면 이 디렉토리 밑에서 찾으면 돼.`,
 
-  // 여기에 추가 프롬프트를 넣으면 됩니다
-  // 예: `[역할] 너는 친절한 개발 도우미야.`,
+  // restarter.sh 사용법
+  `[slack-vibecoder 재시작 요청 처리]
+사용자가 slack-vibecoder(이 봇 자체)의 재시작을 요청하면 restarter.sh 스크립트를 사용해.
+이 스크립트는 현재 실행 중인 slack-vibecoder 서비스 자체를 재시작하는 스크립트야.
+부모 프로세스(claude code)가 죽어도 살아남을 수 있도록 백그라운드에서 detach되어 실행돼.
+
+사용법: ./restarter.sh <SLACK_BOT_TOKEN> <CHANNEL_ID> <THREAD_TS> <SAFE_COMMIT_HASH>
+
+인자 설명:
+- SLACK_BOT_TOKEN: 환경변수 SLACK_BOT_TOKEN에서 가져옴 (재시작 전후 알림용)
+- CHANNEL_ID: 현재 대화 중인 채널 ID
+- THREAD_TS: 현재 대화 중인 스레드의 타임스탬프
+- SAFE_COMMIT_HASH: 실패 시 롤백할 안전한 커밋 해시 (보통 현재 HEAD)
+
+예시:
+./restarter.sh "$SLACK_BOT_TOKEN" "C02S25L4997" "1764406845.056919" "$(cd ~/Projects/slack-vibecoder && git rev-parse HEAD)"
+
+동작 흐름:
+1. "업데이트를 시작합니다" 슬랙 알림
+2. pm2 restart slack-vibecoder 실행
+3. "업데이트 완료! 30초 내에 테스트하세요" 슬랙 알림
+4. 30초 대기 후 헬스체크 (PM2 상태 + TURNAROUND_SUCCESS 로그 확인)
+5. 성공 시 종료, 실패 시 SAFE_COMMIT_HASH로 롤백 후 pm2 재시작`,
 ];
 
 /**
