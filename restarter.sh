@@ -170,27 +170,37 @@ main() {
     # 4. 업데이트 완료 알림
     send_slack_message "업데이트 완료! ${HEALTH_CHECK_TIMEOUT}초 내에 테스트 요청을 보내주세요. 정상 작동하지 않으면 자동으로 롤백됩니다."
 
-    # 5. 헬스체크 대기
-    echo "[$(date)] ${HEALTH_CHECK_TIMEOUT}초간 헬스체크 대기..."
-    sleep "$HEALTH_CHECK_TIMEOUT"
+    # 5. 헬스체크 폴링 (성공 로그가 발견되면 즉시 종료)
+    echo "[$(date)] 헬스체크 시작 (최대 ${HEALTH_CHECK_TIMEOUT}초, 성공 로그 발견 시 즉시 종료)..."
+    
+    local check_interval=2  # 2초마다 확인
+    local elapsed=0
+    local success_detected=0
+    
+    while [ $elapsed -lt $HEALTH_CHECK_TIMEOUT ]; do
+        # PM2 상태 확인
+        if ! check_pm2_health; then
+            echo "[$(date)] PM2 상태 이상, 롤백 시작..."
+            rollback "헬스체크 실패 - PM2 상태 이상 또는 에러 로그 과다 감지"
+            echo "[$(date)] 재시작 스크립트 종료"
+            return
+        fi
 
-    # 6. 상태 확인 (PM2 상태 + 성공적인 턴어라운드 로그)
-    echo "[$(date)] 헬스체크 수행 중..."
+        # 턴어라운드 성공 로그 확인
+        if check_turnaround_success "$RESTART_TIME" 2>/dev/null; then
+            echo "[$(date)] 헬스체크 통과! (턴어라운드 성공 로그 감지됨, ${elapsed}초 경과)"
+            send_slack_message "헬스체크 통과! 업데이트가 성공적으로 완료되었습니다. (재시작 이후 정상 응답 확인됨)"
+            success_detected=1
+            break
+        fi
 
-    if ! check_pm2_health; then
-        echo "[$(date)] PM2 상태 이상, 롤백 시작..."
-        rollback "헬스체크 실패 - PM2 상태 이상 또는 에러 로그 과다 감지"
-        echo "[$(date)] 재시작 스크립트 종료"
-        return
-    fi
+        sleep $check_interval
+        elapsed=$((elapsed + check_interval))
+    done
 
-    echo "[$(date)] PM2 상태 정상. 턴어라운드 성공 로그 확인 중..."
-
-    if check_turnaround_success "$RESTART_TIME"; then
-        echo "[$(date)] 헬스체크 통과! (턴어라운드 성공 로그 감지됨)"
-        send_slack_message "헬스체크 통과! 업데이트가 성공적으로 완료되었습니다. (재시작 이후 정상 응답 확인됨)"
-    else
-        echo "[$(date)] 턴어라운드 성공 로그 없음. PM2 상태는 정상이지만 실제 동작 미확인."
+    # 타임아웃까지 성공 로그를 찾지 못한 경우
+    if [ $success_detected -eq 0 ]; then
+        echo "[$(date)] ${HEALTH_CHECK_TIMEOUT}초 타임아웃. PM2 상태는 정상이지만 턴어라운드 성공 로그 미확인."
         send_slack_message "헬스체크 조건부 통과. PM2 상태는 정상이지만, 재시작 이후 실제 요청 처리는 아직 확인되지 않았습니다. 테스트 요청을 보내주세요."
     fi
 
