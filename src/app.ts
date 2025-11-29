@@ -54,7 +54,7 @@ app.event("app_mention", async ({ event, client, say }) => {
     return;
   }
 
-  console.log(`📩 멘션 수신: ${userQuery} (스레드: ${threadTs})`);
+  console.log(`[${new Date().toISOString()}] 📩 멘션 수신: ${userQuery} (스레드: ${threadTs})`);
 
   // 초기 메시지 전송 (진행 중 상태 + 멈춰 버튼)
   // 스레드 안이면 스레드로, 아니면 채널에 직접
@@ -161,6 +161,9 @@ app.event("app_mention", async ({ event, client, say }) => {
           ],
         });
         activeMessages.delete(messageKey);
+
+        // 성공적인 턴어라운드 로그 (restarter.sh가 감지하는 용도)
+        console.log(`[${new Date().toISOString()}] ✅ TURNAROUND_SUCCESS: 스레드 ${threadTs} 완료 (${timeStr}, 도구 ${summary.toolCallCount}회)`);
       },
 
       // 에러 처리
