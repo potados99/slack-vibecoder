@@ -67,7 +67,37 @@ check_pm2_health() {
     pm2_stderr=$(cat /tmp/pm2_stderr.tmp 2>/dev/null)
     rm -f /tmp/pm2_stderr.tmp
     
-    local status=$(echo "$pm2_output" | grep -o "\"name\":\"$PM2_SERVICE_NAME\"[^}]*\"status\":\"[^\"]*\"" | grep -o "\"status\":\"[^\"]*\"" | cut -d'"' -f4)
+    # pm2 describe를 사용하여 상태 확인 (가장 간단하고 안정적)
+    local status=$(pm2 describe "$PM2_SERVICE_NAME" 2>/dev/null | grep -E "status\s*:" | sed -E 's/.*status\s*:\s*([a-zA-Z]+).*/\1/' | head -1)
+    
+    # pm2 describe가 실패하면 jlist에서 파싱 시도 (fallback)
+    if [ -z "$status" ]; then
+        # jq가 있으면 jq 사용, 없으면 Python 사용 (이미 send_slack_message에서 사용 중)
+        if command -v jq >/dev/null 2>&1; then
+            status=$(echo "$pm2_output" | jq -r ".[] | select(.name == \"$PM2_SERVICE_NAME\") | .pm2_env.status" 2>/dev/null)
+        else
+            # Python 사용 (이미 스크립트에서 사용 중이므로 추가 의존성 없음)
+            status=$(PM2_SERVICE_NAME="$PM2_SERVICE_NAME" python3 -c "
+import json
+import sys
+import os
+service_name = os.environ.get('PM2_SERVICE_NAME', '')
+try:
+    data = json.load(sys.stdin)
+    if isinstance(data, list):
+        for proc in data:
+            if proc.get('name') == service_name:
+                pm2_env = proc.get('pm2_env', {})
+                status = pm2_env.get('status')
+                if status:
+                    print(status)
+                    sys.exit(0)
+    print('', end='')
+except Exception:
+    print('', end='')
+" <<< "$pm2_output")
+        fi
+    fi
     
     if [ -z "$status" ]; then
         HEALTH_CHECK_DETAILS="PM2 상태를 확인할 수 없습니다."
