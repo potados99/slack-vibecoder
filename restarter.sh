@@ -221,7 +221,7 @@ main() {
     # 5. 헬스체크 폴링 (성공 로그가 발견되면 즉시 종료)
     echo "[$(date)] 헬스체크 시작 (최대 ${HEALTH_CHECK_TIMEOUT}초, 성공 로그 발견 시 즉시 종료)..."
     
-    local check_interval=2  # 2초마다 확인
+    local check_interval=1  # 1초마다 확인
     local elapsed=0
     local success_detected=0
     
