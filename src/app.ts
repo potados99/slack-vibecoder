@@ -351,13 +351,14 @@ app.event("app_mention", async ({ event, client, say }) => {
 
       // 최종 결과
       onResult: async (text: string, summary: { durationSeconds: number; toolCallCount: number }) => {
-        // 타이머를 가장 먼저 정리 (경합 조건 방지: updateMetadataOnly가 최종 메시지를 덮어쓰는 것 방지)
+        // 타이머를 가장 먼저 정리 (경합 조건 방지)
+        // 중요: sessionStates.delete를 먼저 호출하여 이미 예약된 updateMetadataOnly가 early return하도록 함
         const sessionState = sessionStates.get(threadTs);
+        sessionStates.delete(threadTs); // 먼저 삭제!
+        
         if (sessionState?.timerId) {
           clearInterval(sessionState.timerId);
-          sessionState.timerId = null;
         }
-        sessionStates.delete(threadTs);
 
         const minutes = Math.floor(summary.durationSeconds / 60);
         const seconds = summary.durationSeconds % 60;
@@ -409,13 +410,13 @@ app.event("app_mention", async ({ event, client, say }) => {
 
       // 에러 처리
       onError: async (error: Error) => {
-        // 타이머 정리
+        // 타이머 정리 (sessionStates.delete를 먼저)
         const sessionState = sessionStates.get(threadTs);
+        sessionStates.delete(threadTs);
+        
         if (sessionState?.timerId) {
           clearInterval(sessionState.timerId);
-          sessionState.timerId = null;
         }
-        sessionStates.delete(threadTs);
         await client.chat.update({
           channel,
           ts: responseTs,
@@ -437,13 +438,13 @@ app.event("app_mention", async ({ event, client, say }) => {
     console.error("Claude 처리 중 오류:", error);
     activeMessages.delete(messageKey);
     
-    // 타이머 정리
+    // 타이머 정리 (sessionStates.delete를 먼저)
     const sessionState = sessionStates.get(threadTs);
+    sessionStates.delete(threadTs);
+    
     if (sessionState?.timerId) {
       clearInterval(sessionState.timerId);
-      sessionState.timerId = null;
     }
-    sessionStates.delete(threadTs);
   }
 });
 
@@ -465,13 +466,13 @@ app.action<BlockAction<ButtonAction>>("stop_claude", async ({ body, ack, client 
 
   console.log(`🛑 중단 요청: 스레드 ${threadTs}`);
 
-  // 타이머 정리
+  // 타이머 정리 (sessionStates.delete를 먼저)
   const sessionState = sessionStates.get(threadTs);
+  sessionStates.delete(threadTs);
+  
   if (sessionState?.timerId) {
     clearInterval(sessionState.timerId);
-    sessionState.timerId = null;
   }
-  sessionStates.delete(threadTs);
 
   // 세션 중단
   const aborted = abortSession(threadTs);
