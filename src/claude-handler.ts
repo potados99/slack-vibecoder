@@ -111,6 +111,12 @@ export async function handleClaudeQuery(
       }
     });
 
+    // 스트림 종료 후 디바운스로 스킵된 마지막 상태가 있으면 강제 전달
+    if (!abortSignal.aborted && progressText) {
+      const elapsedSeconds = Math.round((Date.now() - startTime) / 1000);
+      await callbacks.onProgress(progressText, currentToolInfo, elapsedSeconds, toolCallCount);
+    }
+
     // 최종 결과 전송 (빈 텍스트라도 무조건 호출하여 UI 정리)
     if (!abortSignal.aborted) {
       const finalText = resultText || progressText;
