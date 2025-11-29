@@ -4,7 +4,7 @@
 
 import { getAppStartCommitHash } from "./app-info";
 
-function buildSystemPrompts(): string[] {
+function buildSystemPrompts(threadTs?: string, channelId?: string): string[] {
   const appStartCommitHash = getAppStartCommitHash();
   
   return [
@@ -58,13 +58,20 @@ slack-vibecoder 프로젝트에 변경사항을 커밋하고 푸시할 때는 �
 3. THREAD_TS: 현재 대화 중인 스레드의 타임스탬프
 4. SAFE_COMMIT_HASH: 실패 시 롤백할 안전한 커밋 해시
 
+[중요: THREAD_TS 사용 규칙]
+- 반드시 현재 작업 중인 스레드의 타임스탬프를 사용해야 합니다
+- 이 스레드는 사용자가 재시작을 요청한 메시지가 있는 스레드입니다
+- 잘못된 스레드를 사용하면 시스템 메시지가 다른 스레드로 전송됩니다
+${threadTs ? `- 현재 작업 중인 스레드 타임스탬프: ${threadTs}` : "- 현재 스레드 정보를 사용할 수 없습니다. 사용자가 재시작을 요청한 메시지의 스레드를 확인하세요"}
+${channelId ? `- 현재 채널 ID: ${channelId}` : ""}
+
 [중요: SAFE_COMMIT_HASH 사용 규칙]
 - 현재 HEAD가 아닌 앱이 시작된 시점의 커밋 해시를 사용해야 합니다
 - 이유: 앱이 시작된 후에 코드가 변경되었을 수 있기 때문입니다
 ${appStartCommitHash ? `- 앱이 시작된 시점의 커밋 해시: ${appStartCommitHash}` : "- 앱 시작 시점 커밋 해시를 사용할 수 없으면 fallback으로 현재 HEAD 사용"}
 
 [실행 예시]
-./restarter.sh "$SLACK_BOT_TOKEN" "C02S25L4997" "1764406845.056919" "${appStartCommitHash || '$(cd ~/Projects/slack-vibecoder && git rev-parse HEAD)'}"
+${threadTs && channelId ? `./restarter.sh "$SLACK_BOT_TOKEN" "${channelId}" "${threadTs}" "${appStartCommitHash || '$(cd ~/Projects/slack-vibecoder && git rev-parse HEAD)'}"` : `./restarter.sh "$SLACK_BOT_TOKEN" "<CHANNEL_ID>" "<THREAD_TS>" "${appStartCommitHash || '$(cd ~/Projects/slack-vibecoder && git rev-parse HEAD)'}"`}
 
 [동작 흐름]
 1. "업데이트를 시작합니다" 슬랙 알림 전송
@@ -80,9 +87,9 @@ export const systemPrompts = buildSystemPrompts();
 /**
  * 사용자 쿼리에 시스템 프롬프트를 붙여서 반환
  */
-export function buildPrompt(userQuery: string): string {
+export function buildPrompt(userQuery: string, threadTs?: string, channelId?: string): string {
   // 매번 최신 시스템 프롬프트를 생성 (커밋 해시가 업데이트될 수 있음)
-  const prompts = buildSystemPrompts();
+  const prompts = buildSystemPrompts(threadTs, channelId);
   const systemContext = prompts.join("\n\n");
   return `${userQuery}
 

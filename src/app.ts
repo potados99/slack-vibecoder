@@ -43,7 +43,7 @@ interface SessionState {
   lastToolInfo: string | undefined;
   lastToolCallCount: number;
   channel: string;
-  responseTs?: string; // optional로 변경
+  responseTs: string; // 항상 존재함 (초기화 시 체크함)
   userId: string;
 }
 
@@ -222,7 +222,7 @@ app.event("app_mention", async ({ event, client, say }) => {
 
   // 세션 상태 초기화 및 타이머 시작
   const startTime = Date.now();
-  const sessionState: SessionState = {
+  const sessionState = {
     startTime,
     timerId: null,
     lastText: "",
@@ -231,7 +231,7 @@ app.event("app_mention", async ({ event, client, say }) => {
     channel,
     responseTs,
     userId,
-  };
+  } as SessionState;
   sessionStates.set(threadTs, sessionState);
 
   // 매초 메타데이터 업데이트 타이머 시작
@@ -243,7 +243,7 @@ app.event("app_mention", async ({ event, client, say }) => {
   try {
     await handleClaudeQuery(threadTs, userQuery, {
       // 진행 상황 업데이트
-      onProgress: async (text, toolInfo, elapsedSeconds, toolCallCount) => {
+      onProgress: async (text: string, toolInfo: string | undefined, elapsedSeconds: number, toolCallCount: number) => {
         // 세션 상태 업데이트
         sessionState.lastText = text;
         sessionState.lastToolInfo = toolInfo;
@@ -312,7 +312,7 @@ app.event("app_mention", async ({ event, client, say }) => {
       },
 
       // 최종 결과
-      onResult: async (text, summary) => {
+      onResult: async (text: string, summary: { durationSeconds: number; toolCallCount: number }) => {
         const minutes = Math.floor(summary.durationSeconds / 60);
         const seconds = summary.durationSeconds % 60;
         const timeStr = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
@@ -370,7 +370,7 @@ app.event("app_mention", async ({ event, client, say }) => {
       },
 
       // 에러 처리
-      onError: async (error) => {
+      onError: async (error: Error) => {
         // 타이머 정리
         const sessionState = sessionStates.get(threadTs);
         if (sessionState?.timerId) {
@@ -394,7 +394,7 @@ app.event("app_mention", async ({ event, client, say }) => {
         });
         activeMessages.delete(messageKey);
       },
-    });
+    }, channel);
   } catch (error) {
     console.error("Claude 처리 중 오류:", error);
     activeMessages.delete(messageKey);
