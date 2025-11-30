@@ -68,7 +68,7 @@ Vibe Coder는 Claude Code CLI를 Slack에서 자연어로 직접 사용할 수 �
 다 부서져도 잃을 것 없는 안전한(?) 서버에서 이 저장소를 clone하고, `claude`를 셋업합니다.
 
 서버 요구사항:
-- pm2
+- pm2 (필수: restarter가 pm2 로그를 확인하여 헬스체크를 수행하므로 반드시 pm2로 실행해야 함)
 - pnpm
 - node
 - git
@@ -92,5 +92,5 @@ $ cp ./CLAUDE.md ~/.claude/CLAUDE.md
 
 **pm2로 시작**
 ```bash
-$ pm2 start npm --name "slack-vibecoder" -- start
+$ pm2 start pnpm --name "slack-vibecoder" -- start
 ```
