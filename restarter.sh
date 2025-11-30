@@ -12,7 +12,8 @@
 CHANNEL_ID="$1"
 THREAD_TS="$2"
 SAFE_COMMIT_HASH="$3"
-PROJECT_DIR="/home/potados/Projects/slack-vibecoder"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$SCRIPT_DIR"
 PM2_SERVICE_NAME="slack-vibecoder"
 HEALTH_CHECK_TIMEOUT=30
 
