@@ -168,44 +168,49 @@ app.event("app_mention", async ({ event, client, say }) => {
     console.log(`[${new Date().toISOString()}] 🆕 채널 루트 요청, 임시 세션 키: ${threadTs}`);
   }
 
+  // 초기 메시지 블록 구성
+  const initialBlocks = [
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: initialMetadataText,
+        },
+      ],
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `<@${userId}> 🤔 생각하는 중...`,
+      },
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: {
+            type: "plain_text",
+            text: "🛑 멈춰!",
+            emoji: true,
+          },
+          action_id: "stop_claude",
+          value: threadTs,
+        },
+      ],
+    },
+  ];
+
+  const initialFallbackText = `<@${userId}> 🤔 생각하는 중...`;
+
   // 초기 메시지 전송 (진행 중 상태 + 멈춰 버튼)
   const initialMessage = await client.chat.postMessage({
     channel,
     ...(isInThread && { thread_ts: event.thread_ts }),
-    text: `<@${userId}> 🤔 생각하는 중...`,
-    blocks: [
-      {
-        type: "context",
-        elements: [
-          {
-            type: "mrkdwn",
-            text: initialMetadataText,
-          },
-        ],
-      },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `<@${userId}> 🤔 생각하는 중...`,
-        },
-      },
-      {
-        type: "actions",
-        elements: [
-          {
-            type: "button",
-            text: {
-              type: "plain_text",
-              text: "🛑 멈춰!",
-              emoji: true,
-            },
-            action_id: "stop_claude",
-            value: threadTs,
-          },
-        ],
-      },
-    ],
+    text: initialFallbackText,
+    blocks: initialBlocks,
   });
 
   const responseTsRaw = initialMessage.ts;
@@ -243,8 +248,8 @@ app.event("app_mention", async ({ event, client, say }) => {
     channel,
     responseTs,
     userId,
-    lastBlocks: [], // 아직 블록 없음 - onProgress에서 설정됨
-    lastFallbackText: `<@${userId}> 처리 중...`,
+    lastBlocks: initialBlocks, // 초기 블록 저장 (idempotent 업데이트용)
+    lastFallbackText: initialFallbackText,
   };
   sessionStates.set(threadTs, sessionState);
 
