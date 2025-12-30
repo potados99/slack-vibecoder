@@ -18,7 +18,7 @@ import { sessionManager } from "./session-manager";
 import { setAppStartCommitHash, setAppVersion, getAppVersion, getAppStartCommitHash } from "./app-info";
 
 // 환경 변수 확인
-const requiredEnvVars = ["SLACK_BOT_TOKEN", "SLACK_APP_TOKEN"];
+const requiredEnvVars = ["SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "CLAUDE_CWD"];
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
     console.error(`❌ 환경 변수 ${envVar}가 설정되지 않았습니다.`);

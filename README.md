@@ -87,7 +87,7 @@ $ claude mcp add slack -s user -- npx -y @modelcontextprotocol/server-slack
 
 **전역 시스템 프롬프트 설정**
 ```bash
-$ cp ./CLAUDE.md ~/.claude/CLAUDE.md
+$ cp ./CLAUDE.user.md ~/.claude/CLAUDE.md
 ```
 
 **pm2로 시작**

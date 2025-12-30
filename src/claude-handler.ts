@@ -53,9 +53,15 @@ export async function handleClaudeQuery(
 
   try {
     let claudeBuilder = claude()
-      .skipPermissions()
+      .withConfig({
+        version: "1.0", 
+        globalSettings: {
+          cwd: process.env.CLAUDE_CWD,
+          permissionMode: "bypassPermissions"
+        }
+      })
       .withSignal(abortSignal)
-
+      
       // 도구 사용 시 즉시 UI 업데이트합니다.
       .onToolUse(async (tool) => {
         toolCallCount++;
