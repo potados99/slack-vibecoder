@@ -128,9 +128,11 @@ async function updateMetadataOnly(threadTs: string): Promise<void> {
 app.event("app_mention", async ({ event, client, say }) => {
   const userId = event.user ?? "unknown";
   const channel = event.channel;
-  const messageTs = event.ts;
-  // 스레드 안에서 멘션한 경우에만 스레드로 답장, 아니면 채널에 직접 답장
-  const isInThread = !!event.thread_ts;
+
+  // 세션 키: 항상 사용자 메시지가 스레드 루트
+  // - 스레드 내 요청: 기존 스레드 루트 (event.thread_ts)
+  // - 채널 루트 요청: 사용자 메시지 자체가 스레드 루트 (event.ts)
+  const threadTs = event.thread_ts ?? event.ts;
 
   // 멘션에서 봇 태그 제거하고 실제 메시지 추출
   const botMentionRegex = /<@[A-Z0-9]+>/g;
@@ -139,12 +141,12 @@ app.event("app_mention", async ({ event, client, say }) => {
   if (!userQuery) {
     await say({
       text: `${getUserMention(userId)} 무엇을 도와드릴까요? 메시지를 함께 보내주세요!`.trim(),
-      ...(isInThread && { thread_ts: event.thread_ts }),
+      thread_ts: threadTs,
     });
     return;
   }
 
-  console.log(`[${new Date().toISOString()}] 📩 멘션 수신: ${userQuery} (채널 루트 요청: ${!isInThread})`);
+  console.log(`[${new Date().toISOString()}] 📩 멘션 수신: ${userQuery} (스레드: ${threadTs})`);
 
   // 메타데이터 구성
   const version = getAppVersion();
@@ -160,21 +162,6 @@ app.event("app_mention", async ({ event, client, say }) => {
   
   const versionInfo = versionInfoParts.length > 0 ? `, ${versionInfoParts.join(" ")}` : "";
   const initialMetadataText = `_0초 경과, 도구 0회 호출${versionInfo}_`;
-
-  // 세션 키 결정: 스레드 루트가 세션 키
-  // - 스레드 내 요청: 스레드 루트 (event.thread_ts)
-  // - 채널 루트 요청: 봇의 첫 응답이 스레드 루트가 됨 (아직 생성 전)
-  let threadTs: string;
-  
-  if (isInThread) {
-    // 스레드 내 요청: 기존 스레드 루트 사용
-    threadTs = event.thread_ts!;
-    console.log(`[${new Date().toISOString()}] 🔗 스레드 내 요청, 세션 키: ${threadTs}`);
-  } else {
-    // 채널 루트 요청: 임시 세션 키 사용 (responseTs가 확정되면 세션 이동)
-    threadTs = `temp_${messageTs}`;
-    console.log(`[${new Date().toISOString()}] 🆕 채널 루트 요청, 임시 세션 키: ${threadTs}`);
-  }
 
   // 초기 메시지 블록 구성
   const initialBlocks = [
@@ -214,9 +201,10 @@ app.event("app_mention", async ({ event, client, say }) => {
   const initialFallbackText = `${getUserMention(userId)} 🤔 생각하는 중...`.trim();
 
   // 초기 메시지 전송 (진행 중 상태 + 멈춰 버튼)
+  // 항상 사용자 메시지의 스레드로 답장
   const initialMessage = await client.chat.postMessage({
     channel,
-    ...(isInThread && { thread_ts: event.thread_ts }),
+    thread_ts: threadTs,
     text: initialFallbackText,
     blocks: initialBlocks,
   });
@@ -227,23 +215,7 @@ app.event("app_mention", async ({ event, client, say }) => {
     return;
   }
   const responseTs: string = responseTsRaw;
-
-  // 채널 루트 요청인 경우: 세션 키를 responseTs로 확정하고 세션 이동
-  if (!isInThread) {
-    const tempThreadTs = threadTs;
-    threadTs = responseTs; // 세션 키를 responseTs로 확정
-    
-    // 임시 세션이 있으면 새 세션 키로 이동
-    if (sessionManager.hasSession(tempThreadTs)) {
-      const tempSession = sessionManager.getOrCreateSession(tempThreadTs);
-      sessionManager.updateClaudeSessionId(threadTs, tempSession.claudeSessionId || '');
-      sessionManager.deleteSession(tempThreadTs);
-    }
-    
-    console.log(`[${new Date().toISOString()}] 🤖 봇 응답 생성: ${responseTs}, 세션 키 확정: ${threadTs}`);
-  } else {
-    console.log(`[${new Date().toISOString()}] 🤖 봇 응답 생성: ${responseTs}, 세션 키: ${threadTs}`);
-  }
+  console.log(`[${new Date().toISOString()}] 🤖 봇 응답 생성: ${responseTs}, 세션 키: ${threadTs}`);
 
   const messageKey = `${channel}:${threadTs}`;
   activeMessages.set(messageKey, responseTs);
@@ -475,7 +447,7 @@ app.event("app_mention", async ({ event, client, say }) => {
         });
         activeMessages.delete(messageKey);
       },
-    }, channel, responseTs, isInThread);
+    }, channel);
   } catch (error) {
     console.error("Claude 처리 중 오류:", error);
     activeMessages.delete(messageKey);

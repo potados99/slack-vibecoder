@@ -6,7 +6,7 @@
 
 import { getAppStartCommitHash } from "./app-info";
 
-function buildSystemPrompts(threadTs?: string, channelId?: string, responseTs?: string, isInThread?: boolean): string[] {
+function buildSystemPrompts(threadTs?: string, channelId?: string): string[] {
   const appStartCommitHash = getAppStartCommitHash();
 
   return [
@@ -62,11 +62,8 @@ function buildSystemPrompts(threadTs?: string, channelId?: string, responseTs?: 
 
 [중요: THREAD_TS 사용 규칙]
 - 시스템 메시지는 반드시 올바른 스레드에 전송되어야 합니다
-- 사용자가 스레드 안에서 재시작을 요청한 경우: 사용자가 요청한 메시지가 있는 스레드의 타임스탬프를 사용하세요
-- 사용자가 채널 루트에서 재시작을 요청한 경우: 봇이 답변하는 메시지의 타임스탬프를 사용하세요 (이 메시지에 스레드로 시스템 메시지가 달립니다)
-${isInThread !== undefined ? (isInThread ? "- 현재 상황: 사용자가 스레드 안에서 요청했습니다" : "- 현재 상황: 사용자가 채널 루트에서 요청했습니다") : ""}
-${isInThread === false && responseTs ? `- 봇의 응답 메시지 타임스탬프 (채널 루트 요청 시 사용): ${responseTs}` : ""}
-${isInThread === true && threadTs ? `- 사용자 요청 스레드 타임스탬프 (스레드 안 요청 시 사용): ${threadTs}` : ""}
+- 항상 사용자 메시지의 스레드 타임스탬프를 사용하세요
+${threadTs ? `- 현재 스레드 타임스탬프: ${threadTs}` : ""}
 ${channelId ? `- 현재 채널 ID: ${channelId}` : ""}
 
 [중요: SAFE_COMMIT_HASH 사용 규칙]
@@ -75,9 +72,7 @@ ${channelId ? `- 현재 채널 ID: ${channelId}` : ""}
 ${appStartCommitHash ? `- 앱이 시작된 시점의 커밋 해시: ${appStartCommitHash}` : "- 앱 시작 시점 커밋 해시를 사용할 수 없으면 fallback으로 현재 HEAD 사용"}
 
 [실행 예시]
-${isInThread === false && responseTs && channelId ? `# 채널 루트에서 요청한 경우: 봇의 응답 메시지 타임스탬프 사용
-./restarter.sh "${channelId}" "${responseTs}" "${appStartCommitHash || '$(cd ~/Projects/slack-vibecoder && git rev-parse HEAD)'}"` : isInThread === true && threadTs && channelId ? `# 스레드 안에서 요청한 경우: 사용자 요청 스레드 타임스탬프 사용
-./restarter.sh "${channelId}" "${threadTs}" "${appStartCommitHash || '$(cd ~/Projects/slack-vibecoder && git rev-parse HEAD)'}"` : `./restarter.sh "<CHANNEL_ID>" "<THREAD_TS>" "${appStartCommitHash || '$(cd ~/Projects/slack-vibecoder && git rev-parse HEAD)'}"`}
+${threadTs && channelId ? `./restarter.sh "${channelId}" "${threadTs}" "${appStartCommitHash || '$(cd ~/Projects/slack-vibecoder && git rev-parse HEAD)'}"` : `./restarter.sh "<CHANNEL_ID>" "<THREAD_TS>" "${appStartCommitHash || '$(cd ~/Projects/slack-vibecoder && git rev-parse HEAD)'}"`}
 
 [동작 흐름]
 1. "업데이트를 시작합니다" 슬랙 알림 전송
@@ -93,9 +88,9 @@ export const systemPrompts = buildSystemPrompts();
 /**
  * 사용자 쿼리에 시스템 프롬프트를 붙여서 반환
  */
-export function buildPrompt(userQuery: string, threadTs?: string, channelId?: string, responseTs?: string, isInThread?: boolean): string {
+export function buildPrompt(userQuery: string, threadTs?: string, channelId?: string): string {
   // 매번 최신 시스템 프롬프트를 생성 (커밋 해시가 업데이트될 수 있음)
-  const prompts = buildSystemPrompts(threadTs, channelId, responseTs, isInThread);
+  const prompts = buildSystemPrompts(threadTs, channelId);
   const systemContext = prompts.join("\n\n");
   return `${userQuery}
 
