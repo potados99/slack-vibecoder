@@ -49,6 +49,21 @@ interface SessionState {
   userId: string;
   lastBlocks: Array<Record<string, unknown>>; // 마지막으로 보낸 블록들 (idempotent 업데이트용)
   lastFallbackText: string; // 마지막으로 보낸 fallback 텍스트
+  /**
+   * 세션 완료 여부 플래그.
+   *
+   * Race condition 방지용:
+   * - 문제: onResult가 실행되기 전에 이미 스케줄된 updateMetadataOnly 타이머 콜백이
+   *   있으면, clearInterval 이후에도 해당 콜백의 chat.update가 완료되면서
+   *   최종 메시지를 "작업 중..." 상태로 덮어쓸 수 있음
+   * - 해결: onResult 시작 시 isCompleted = true로 설정하고,
+   *   updateMetadataOnly에서 chat.update 직전에 이 플래그를 체크하여
+   *   완료된 세션에 대한 업데이트를 차단
+   *
+   * @see updateMetadataOnly - chat.update 전 isCompleted 체크
+   * @see onResult - 가장 먼저 isCompleted = true 설정
+   */
+  isCompleted: boolean;
 }
 
 const sessionStates = new Map<string, SessionState>();
@@ -79,10 +94,19 @@ function truncateForSlack(text: string, maxLength: number = 2500): string {
  * idempotent 설계: 마지막으로 보낸 블록을 그대로 사용하되
  * context 블록의 시간 부분만 현재 시간으로 교체합니다.
  * 이렇게 하면 진행 중이든 완료 후든 언제 호출해도 안전합니다.
+ *
+ * Race condition 방지:
+ * - 이 함수는 setInterval로 매초 호출되며, 비동기적으로 실행됨
+ * - onResult가 clearInterval을 호출해도, 이미 스케줄된 콜백은 실행될 수 있음
+ * - 따라서 chat.update 직전에 isCompleted 플래그를 체크하여
+ *   완료된 세션의 메시지를 덮어쓰는 것을 방지함
  */
 async function updateMetadataOnly(threadTs: string): Promise<void> {
   const state = sessionStates.get(threadTs);
   if (!state || !state.responseTs || !state.lastBlocks || state.lastBlocks.length === 0) return;
+
+  // 1차 체크: 이미 완료된 세션이면 업데이트하지 않음
+  if (state.isCompleted) return;
 
   // 현재 경과 시간 계산
   const elapsedSeconds = Math.round((Date.now() - state.startTime) / 1000);
@@ -105,6 +129,10 @@ async function updateMetadataOnly(threadTs: string): Promise<void> {
       }
     }
   }
+
+  // 2차 체크: 블록 준비 후, chat.update 직전에 다시 확인
+  // (블록 처리 중에 onResult가 실행되어 isCompleted가 true로 변경되었을 수 있음)
+  if (state.isCompleted) return;
 
   try {
     await app.client.chat.update({
@@ -232,6 +260,7 @@ app.event("app_mention", async ({ event, client, say }) => {
     userId,
     lastBlocks: initialBlocks, // 초기 블록 저장 (idempotent 업데이트용)
     lastFallbackText: initialFallbackText,
+    isCompleted: false, // 세션 완료 여부 (race condition 방지용)
   };
   sessionStates.set(threadTs, sessionState);
 
@@ -340,6 +369,12 @@ app.event("app_mention", async ({ event, client, say }) => {
           text: string,
           summary: { durationSeconds: number; toolCallCount: number },
         ) => {
+          // 세션 완료 표시 (race condition 방지)
+          // 중요: 이 플래그를 가장 먼저 설정해야 함!
+          // updateMetadataOnly가 이미 실행 중이더라도, chat.update 직전에
+          // 이 플래그를 체크하여 최종 메시지 덮어쓰기를 방지함
+          sessionState.isCompleted = true;
+
           // 타이머 정리 (idempotent 설계로 세션은 삭제하지 않음)
           if (sessionState.timerId) {
             clearInterval(sessionState.timerId);
@@ -433,6 +468,9 @@ app.event("app_mention", async ({ event, client, say }) => {
 
         // 에러 처리
         onError: async (error: Error) => {
+          // 세션 완료 표시 (race condition 방지)
+          sessionState.isCompleted = true;
+
           // 타이머 정리 (idempotent 설계로 세션은 삭제하지 않음)
           if (sessionState.timerId) {
             clearInterval(sessionState.timerId);
