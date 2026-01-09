@@ -444,19 +444,23 @@ app.event("app_mention", async ({ event, client, say }) => {
             blocks: finalBlocks,
           });
 
-          // Quick fix: 1초 후에 한 번 더 업데이트하여 경합 조건으로 인한 덮어쓰기 방지
-          setTimeout(async () => {
-            try {
-              await client.chat.update({
-                channel,
-                ts: responseTs,
-                text: fallbackText,
-                blocks: finalBlocks,
-              });
-            } catch {
-              // 재시도 실패는 무시
-            }
-          }, 1000);
+          // Race condition 방지: 3초간 반복 업데이트
+          // updateMetadataOnly의 네트워크 요청이 늦게 도착해서 최종 메시지를 덮어쓸 수 있음
+          // 1초, 2초, 3초 후에 다시 업데이트하여 확실하게 최종 상태 유지
+          for (const delay of [1000, 2000, 3000]) {
+            setTimeout(async () => {
+              try {
+                await client.chat.update({
+                  channel,
+                  ts: responseTs,
+                  text: fallbackText,
+                  blocks: finalBlocks,
+                });
+              } catch {
+                // 재시도 실패는 무시
+              }
+            }, delay);
+          }
 
           activeMessages.delete(messageKey);
 
