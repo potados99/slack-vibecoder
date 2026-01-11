@@ -1,6 +1,6 @@
 # Vibe Coder
 
-<img src="vibecoder.png" width="200">
+<img src="assets/vibecoder-icon.jpg" width="200">
 
 *바이브 코딩 "딸깍"봇!*
 
