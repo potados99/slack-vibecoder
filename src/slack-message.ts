@@ -274,3 +274,86 @@ export function buildAbortedMessage(userId: string): MessageBlocks {
     fallbackText: "작업이 중단되었습니다.",
   };
 }
+
+// ============================================================================
+// 큐잉 관련 메시지 빌더들
+// ============================================================================
+
+/**
+ * "큐잉됨" 메시지를 생성합니다.
+ * 즉시처리/취소 버튼을 포함합니다.
+ */
+export function buildQueuedMessage(
+  userId: string,
+  threadTs: string,
+  messageId: string,
+  queuePosition: number,
+): MessageBlocks {
+  const userMention = getUserMention(userId);
+  const positionText = queuePosition === 1 ? "다음 순서입니다" : `${queuePosition}번째 순서입니다`;
+  const text =
+    `${userMention} 📋 현재 다른 작업을 처리 중이에요. ${positionText}.\n바로 처리하고 싶으면 "즉시 처리" 버튼을 눌러주세요.`.trim();
+
+  const blocks = [
+    buildTextBlock(text),
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "⚡ 즉시 처리", emoji: true },
+          action_id: "process_now",
+          value: JSON.stringify({ threadTs, messageId }),
+          style: "primary",
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: "❌ 취소", emoji: true },
+          action_id: "cancel_queued",
+          value: JSON.stringify({ threadTs, messageId }),
+        },
+      ],
+    },
+  ];
+
+  return {
+    blocks,
+    fallbackText: `${userMention} 큐잉됨 (${positionText})`.trim(),
+  };
+}
+
+/**
+ * "취소됨" 메시지를 생성합니다.
+ */
+export function buildCancelledMessage(userId: string): MessageBlocks {
+  const userMention = getUserMention(userId);
+  const text = `${userMention} 🚫 요청이 취소되었습니다.`.trim();
+
+  return {
+    blocks: [buildTextBlock(text)],
+    fallbackText: "요청이 취소되었습니다.",
+  };
+}
+
+/**
+ * 큐에서 처리 시작 메시지를 생성합니다.
+ * (큐잉 메시지를 업데이트할 때 사용)
+ */
+export function buildProcessingFromQueueMessage(userId: string, threadTs: string): MessageBlocks {
+  const userMention = getUserMention(userId);
+  const versionInfo = getVersionInfoText();
+
+  const blocks = [
+    {
+      type: "context",
+      elements: [{ type: "mrkdwn", text: `_0초 경과, 도구 0회 호출${versionInfo}_` }],
+    },
+    buildTextBlock(`${userMention} 🤔 생각하는 중...`.trim()),
+    buildStopButtonBlock(threadTs),
+  ];
+
+  return {
+    blocks,
+    fallbackText: `${userMention} 🤔 생각하는 중...`.trim(),
+  };
+}

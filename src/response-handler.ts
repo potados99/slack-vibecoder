@@ -101,6 +101,37 @@ export class ResponseHandler {
   }
 
   /**
+   * 기존 메시지를 업데이트하여 "생각하는 중..." 상태로 시작합니다.
+   * 큐에서 처리할 때 사용합니다.
+   * 반환값: 메시지 타임스탬프 (실패 시 null)
+   */
+  async startWithExistingMessage(existingTs: string): Promise<string | null> {
+    this.startTime = Date.now();
+    this.responseTs = existingTs;
+
+    const { blocks, fallbackText } = buildThinkingMessage(this.userId, this.threadTs);
+    this.lastBlocks = blocks;
+    this.lastFallbackText = fallbackText;
+
+    try {
+      await this.client.chat.update({
+        channel: this.channel,
+        ts: existingTs,
+        text: fallbackText,
+        blocks,
+      });
+    } catch (error) {
+      console.error("기존 메시지 업데이트 실패:", error);
+      return null;
+    }
+
+    // 매초 메타데이터 업데이트 타이머 시작
+    this.timerId = setInterval(() => this.updateMetadataOnly(), 1000);
+
+    return this.responseTs;
+  }
+
+  /**
    * 진행 상황을 업데이트합니다. (onProgress 콜백용)
    */
   async updateProgress(
