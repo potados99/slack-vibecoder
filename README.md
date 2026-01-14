@@ -23,7 +23,7 @@
 1. 내부적으로는 요청을 처리할 때마다 `claude -p` 명령으로 프롬프트를 전달한 후 stdout을 파싱하는 방식으로 작동합니다. 이때 `--dangerously-skip-permissions` 옵션을 사용하여 권한 검사를 건너뜁니다.
 2. 이로 인해 회사 서버에 두기에는 `claude`가 비정상적으로 작동하여 위험해질 수 있으므로, 안전을 위해 아무 것도 없는 개인(병준) 서버(OCI 무료 인스턴스)의 ~/Projects/slack-vibecoder 경로 아래에서 실행하고 있습니다.
 3. Claude에 로그인된 계정은 회사에서 제공한 개인(병준) 계정입니다. 따라서 상황에 따라 사용량 제한이 걸릴 수 있습니다.
-4. GitHub 연결 또한 개인(병준) 계정입니다. 따라서 커밋이 potados99 계정으로 올라갑니다.
+4. GitHub push는 조직 공용 계정의 SSH 키를 사용합니다. 커밋 author는 슬랙 유저별로 매핑된 GitHub 정보를 사용합니다.
 
 ## 이 앱을 배포하려면
 
@@ -89,6 +89,25 @@ $ claude mcp add slack -s user -- npx -y @modelcontextprotocol/server-slack
 ```bash
 $ cp ./CLAUDE.user.md ~/.claude/CLAUDE.md
 ```
+
+**GitHub 사용자 매핑 설정**
+
+슬랙 유저별로 커밋 author를 올바르게 설정하기 위해 매핑 파일을 생성합니다:
+```bash
+$ cp github-users.example.json github-users.json
+$ vi github-users.json  # 실제 슬랙 유저 ID와 GitHub 정보로 수정
+```
+
+매핑 파일 형식:
+```json
+{
+  "U09P6UZ4C00": "potados99"
+}
+```
+- 키: 슬랙 유저 ID (슬랙에서 유저 프로필 > 점 세 개 메뉴 > Copy member ID로 확인)
+- 값: GitHub 사용자명 (이메일은 자동으로 `username@users.noreply.github.com` 형식 사용)
+
+이 파일은 `.gitignore`에 포함되어 있어 git에 추적되지 않습니다.
 
 **pm2로 시작**
 ```bash

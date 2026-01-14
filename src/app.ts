@@ -167,6 +167,7 @@ async function startProcessing(
         },
       },
       channel,
+      userId,
     );
   } catch (error) {
     console.error("Claude 처리 중 오류:", error);

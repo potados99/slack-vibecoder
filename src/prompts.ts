@@ -5,8 +5,9 @@
  */
 
 import { getAppStartCommitHash } from "./app-info";
+import { getGitAuthor } from "./github-users";
 
-function buildSystemPrompts(threadTs?: string, channelId?: string): string[] {
+function buildSystemPrompts(threadTs?: string, channelId?: string, slackUserId?: string): string[] {
   const appStartCommitHash = getAppStartCommitHash();
 
   return [
@@ -39,6 +40,11 @@ function buildSystemPrompts(threadTs?: string, channelId?: string): string[] {
 - 맥락을 찾지 못하겠다면 Slack 스레드와 근처 메시지들을 확인하세요.
 - 그래도 모르겠다면 사용자에게 질문하세요.
 - 사용자가 "너", "봇" 또는 "slack-vibecoder" 등을 명시적으로 언급한 것이 아니라면, slack-vibecoder 프로젝트를 뒤적거리면 안 됩니다.`,
+
+    `=== Git 커밋 작성자 정보 ===
+커밋 시 반드시 아래 규칙을 따르세요.
+- --author="${getGitAuthor(slackUserId)}" 옵션 사용
+- 커밋 메시지 끝에 Co-authored-by: Claude <noreply@anthropic.com> 추가`,
 
     `=== slack-vibecoder 재시작 처리 ===
 사용자가 slack-vibecoder(이 봇 자체)의 재시작을 요청하면 slack-vibecoder 프로젝트 루트에서 restarter.sh 스크립트를 사용하세요.
@@ -87,9 +93,14 @@ export const systemPrompts = buildSystemPrompts();
 /**
  * 사용자 쿼리에 시스템 프롬프트를 붙여서 반환
  */
-export function buildPrompt(userQuery: string, threadTs?: string, channelId?: string): string {
+export function buildPrompt(
+  userQuery: string,
+  threadTs?: string,
+  channelId?: string,
+  slackUserId?: string,
+): string {
   // 매번 최신 시스템 프롬프트를 생성 (커밋 해시가 업데이트될 수 있음)
-  const prompts = buildSystemPrompts(threadTs, channelId);
+  const prompts = buildSystemPrompts(threadTs, channelId, slackUserId);
   const systemContext = prompts.join("\n\n");
   return `${userQuery}
 

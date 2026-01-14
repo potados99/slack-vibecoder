@@ -41,6 +41,7 @@ export async function handleClaudeQuery(
   userQuery: string,
   callbacks: StreamCallbacks,
   channelId?: string,
+  slackUserId?: string,
 ): Promise<string | null> {
   const session = sessionManager.getOrCreateSession(threadTs);
   const abortSignal = session.abortController.signal;
@@ -137,7 +138,7 @@ export async function handleClaudeQuery(
       console.log(`[${new Date().toISOString()}] 🆕 새 세션 시작 (스레드: ${threadTs})`);
     }
 
-    const prompt = buildPrompt(userQuery, threadTs, channelId);
+    const prompt = buildPrompt(userQuery, threadTs, channelId, slackUserId);
 
     // 스트림을 실행합니다. 콜백들이 자동으로 호출됩니다.
     await claudeBuilder.query(prompt).stream(async () => {
